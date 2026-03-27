@@ -7,7 +7,7 @@ import sys
 from testutils import cppcheck
 
 
-@pytest.mark.parametrize("project_ext", ["json", "sln", "vcxproj", "bpr", "cppcheck"])
+@pytest.mark.parametrize("project_ext", ["json", "sln", "slnx", "vcxproj", "bpr", "cppcheck"])
 def test_missing_project(project_ext):
     project_file = "file.{}".format(project_ext)
 
