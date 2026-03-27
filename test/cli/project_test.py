@@ -33,6 +33,7 @@ def __test_project_error(tmpdir, ext, content, expected):
 @pytest.mark.parametrize("project_ext, expected", [
     ("json", "compilation database is not a JSON array"),
     ("sln", "Visual Studio solution file is empty"),
+    ("slnx", "Visual Studio solution file is not a valid XML - XML_ERROR_EMPTY_DOCUMENT"),
     ("vcxproj", "Visual Studio project file is not a valid XML - XML_ERROR_EMPTY_DOCUMENT"),
     ("bpr", "Borland project file is not a valid XML - XML_ERROR_EMPTY_DOCUMENT"),
     ("cppcheck", "Cppcheck GUI project file is not a valid XML - XML_ERROR_EMPTY_DOCUMENT")

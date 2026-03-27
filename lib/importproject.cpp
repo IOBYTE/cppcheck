@@ -513,13 +513,13 @@ bool ImportProject::importSlnx(const std::string& filename, const std::vector<st
     tinyxml2::XMLDocument doc;
     const tinyxml2::XMLError error = doc.LoadFile(filename.c_str());
     if (error != tinyxml2::XML_SUCCESS) {
-        errors.emplace_back(std::string("Visual Studio project file is not a valid XML - ") + tinyxml2::XMLDocument::ErrorIDToName(error));
+        errors.emplace_back(std::string("Visual Studio solution file is not a valid XML - ") + tinyxml2::XMLDocument::ErrorIDToName(error));
         return false;
     }
 
     const tinyxml2::XMLElement* const rootnode = doc.FirstChildElement();
     if (rootnode == nullptr) {
-        errors.emplace_back("Visual Studio project file has no XML root node");
+        errors.emplace_back("Visual Studio solution file has no XML root node");
         return false;
     }
 
