@@ -139,7 +139,7 @@ def test_sln_project_file_not_found(tmpdir):
     __test_project_error(tmpdir, "sln", content, expected)
 
 
-def test_snlx_no_xml_root(tmpdir):
+def test_slnx_no_xml_root(tmpdir):
     content = '<?xml version="1.0" encoding="utf-8"?>'
 
     expected = "Visual Studio solution file has no XML root node"
