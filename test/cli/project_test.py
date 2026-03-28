@@ -147,7 +147,7 @@ def test_slnx_no_xml_root(tmpdir):
     __test_project_error(tmpdir, "slnx", content, expected)
 
 
-def test_sln_no_projects(tmpdir):
+def test_slnx_no_projects(tmpdir):
     content = "\xEF\xBB\xBF\r\n" \
               '<?xml version="1.0" encoding="UTF-8"?>\r\n' \
               "<Solution>\r\n" \
