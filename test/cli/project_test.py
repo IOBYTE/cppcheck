@@ -148,8 +148,7 @@ def test_slnx_no_xml_root(tmpdir):
 
 
 def test_slnx_no_projects(tmpdir):
-    content = "\xEF\xBB\xBF\r\n" \
-              '<?xml version="1.0" encoding="UTF-8"?>\r\n' \
+    content = '<?xml version="1.0" encoding="UTF-8"?>\r\n' \
               "<Solution>\r\n" \
               "  <Configurations>\r\n" \
               '    <Platform Name="x64" />\r\n' \
@@ -163,8 +162,7 @@ def test_slnx_no_projects(tmpdir):
 
 
 def test_slnx_project_file_not_found(tmpdir):
-    content = "\xEF\xBB\xBF\r\n" \
-              '<?xml version="1.0" encoding="UTF-8"?>\r\n' \
+    content = '<?xml version="1.0" encoding="UTF-8"?>\r\n' \
               "<Solution>\r\n" \
               "  <Configurations>\r\n" \
               '    <Platform Name="x64" />\r\n' \
