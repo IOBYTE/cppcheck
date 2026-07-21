@@ -241,6 +241,7 @@ private:
         TEST_CASE(vardecl_stl_3);
         TEST_CASE(vardecl_template_1);
         TEST_CASE(vardecl_template_2);
+        TEST_CASE(vardecl_template_3);
         TEST_CASE(vardecl_union);
         TEST_CASE(vardecl_par);     // #2743 - set links if variable type contains parentheses
         TEST_CASE(vardecl_par2);    // #3912 - set correct links
@@ -2392,6 +2393,19 @@ private:
         const char code[] = "const string str = x<8,int>();";
         const char expected[]  = "const string str = x < 8 , int > ( ) ;";
         ASSERT_EQUALS(expected, tokenizeAndStringify(code));
+    }
+
+    void vardecl_template_3() {
+        const char code[] = "template <class T>\n" // #14909
+                            "void f(T x) {\n"
+                            "    const auto y = h<T, x.size()>;\n"
+                            "}";
+        const char expected[]  = "template < class T >\n"
+                                 "void f ( T x ) {\n"
+                                 "const auto y = h < T , x . size ( ) > ;\n"
+                                 "}";
+        ASSERT_EQUALS(expected, tokenizeAndStringify(code));
+        ASSERT_EQUALS("[test.cpp:3:11]: (debug) auto token with no type. [autoNoType]\n", errout_str());
     }
 
     void vardecl_union() {
