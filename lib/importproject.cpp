@@ -821,15 +821,11 @@ namespace {
     struct ForcedIncludeFiles {
         ForcedIncludeFiles(std::string condition, const std::string &commaSeparatedFiles) : condition(std::move(condition)) {
             std::vector<std::string> splitFiles = splitString(commaSeparatedFiles, ';');
-            for (const std::string &file : splitFiles) {
-                files.push_back(file);
-            }
+            std::copy(splitFiles.begin(), splitFiles.end(), std::back_inserter(files));
         }
         explicit ForcedIncludeFiles(const std::string &commaSeparatedFiles) {
             std::vector<std::string> splitFiles = splitString(commaSeparatedFiles, ';');
-            for (const std::string &file : splitFiles) {
-                files.push_back(file);
-            }
+            std::copy(splitFiles.begin(), splitFiles.end(), std::back_inserter(files));
         }
         std::string condition;
         std::list<std::string> files;
