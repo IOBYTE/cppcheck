@@ -819,13 +819,13 @@ namespace {
     };
 
     struct ForcedIncludeFiles {
-        ForcedIncludeFiles::ForcedIncludeFiles(std::string condition, const std::string &commaSeparatedFiles) : condition(std::move(condition)) {
+        ForcedIncludeFiles(std::string condition, const std::string &commaSeparatedFiles) : condition(std::move(condition)) {
             std::vector<std::string> splitFiles = splitString(commaSeparatedFiles, ';');
             for (const std::string &file : splitFiles) {
                 files.push_back(file);
             }
         }
-        explicit ForcedIncludeFiles::ForcedIncludeFiles(const std::string &commaSeparatedFiles) {
+        explicit ForcedIncludeFiles(const std::string &commaSeparatedFiles) {
             std::vector<std::string> splitFiles = splitString(commaSeparatedFiles, ';');
             for (const std::string &file : splitFiles) {
                 files.push_back(file);
