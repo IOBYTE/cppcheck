@@ -22,7 +22,7 @@ def test_forced1():
     filename2 = os.path.join('forced1', 'DebugX64.h')
     assert ret == 0, stdout
     expected = (
-        '[%s:5]: (error) Division by zero.\n'
+        '[%s:6]: (error) Division by zero.\n'
         '[%s:4]: (error) Division by zero.\n' % (filename1, filename2)
     )
     assert get_lines(stderr) == get_lines(expected)
