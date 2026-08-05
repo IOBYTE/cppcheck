@@ -11,7 +11,7 @@ __proj_dir = os.path.join(__script_dir, 'forced1')
 def get_lines(s):
     return sorted(s.split('\n'))
 
-def test_exclude():
+def test_forced1():
     args = [
         '--template=cppcheck1',
         '--project=forced1/forced1.cppcheck',
