@@ -853,7 +853,7 @@ namespace {
                 }
             }
         }
-        bool exclude(const ProjectConfiguration& p, std::vector<std::string> &errors) const {
+        bool exclude(const ProjectConfiguration &p, std::vector<std::string> &errors) const {
             if (mConditions.empty())
                 return false;
             for (const std::string &condition : mConditions) {
