@@ -836,20 +836,16 @@ namespace {
         ItemGroupClCompile(const tinyxml2::XMLElement *element, std::string file) : mFilename(std::move(file)) {
             for (const tinyxml2::XMLElement* childElement = element->FirstChildElement(); childElement; childElement = childElement->NextSiblingElement()) {
                 const char *name = childElement->Name();
-                if (!name)
+                const char *text = childElement->GetText();
+                if (!name || !text)
                     continue;
+                const char *condition = childElement->Attribute("Condition");
                 if (std::strcmp(name, "ExcludedFromBuild") == 0) {
-                    const char *condition = childElement->Attribute("Condition");
-                    const char *text = childElement->GetText();
-                    if (!condition || !text || std::strcmp(text, "true") != 0)
+                    if (!condition || std::strcmp(text, "true") != 0)
                         continue;
                     mConditions.emplace_back(condition);
                 }
                 else if (std::strcmp(name, "ForcedIncludeFiles") == 0) {
-                    const char *condition = childElement->Attribute("Condition");
-                    const char *text = childElement->GetText();
-                    if (!text)
-                        continue;
                     if (condition)
                         forcedIncludeFiles.emplace_back(condition, text);
                     else
