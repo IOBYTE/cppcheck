@@ -752,6 +752,19 @@ namespace {
         std::string mCondition;
     };
 
+    struct ForcedIncludeFiles {
+        ForcedIncludeFiles(std::string condition, const std::string &commaSeparatedFiles) : condition(std::move(condition)) {
+            std::vector<std::string> splitFiles = splitString(commaSeparatedFiles, ';');
+            std::copy(splitFiles.begin(), splitFiles.end(), std::back_inserter(files));
+        }
+        explicit ForcedIncludeFiles(const std::string &commaSeparatedFiles) {
+            std::vector<std::string> splitFiles = splitString(commaSeparatedFiles, ';');
+            std::copy(splitFiles.begin(), splitFiles.end(), std::back_inserter(files));
+        }
+        std::string condition;
+        std::list<std::string> files;
+    };
+
     struct ItemDefinitionGroup : Conditional {
         explicit ItemDefinitionGroup(const tinyxml2::XMLElement *idg, std::string includePaths) : Conditional(idg), additionalIncludePaths(std::move(includePaths)) {
             for (const tinyxml2::XMLElement *e1 = idg->FirstChildElement(); e1; e1 = e1->NextSiblingElement()) {
@@ -780,6 +793,12 @@ namespace {
                                 cppstd = Standards::CPPLatest;
                         } else if (std::strcmp(ename, "EnableEnhancedInstructionSet") == 0) {
                             enhancedInstructionSet = text;
+                        } else if (std::strcmp(ename, "ForcedIncludeFiles") == 0) {
+                            const char *condition = e->Attribute("Condition");
+                            if (condition)
+                                forcedIncludeFiles.emplace_back(condition, text);
+                            else
+                                forcedIncludeFiles.emplace_back(text);
                         }
                     }
                 }
@@ -799,6 +818,7 @@ namespace {
         std::string enhancedInstructionSet;
         std::string preprocessorDefinitions;
         std::string additionalIncludePaths;
+        std::list<ForcedIncludeFiles> forcedIncludeFiles;
         std::string entryPointSymbol; // TODO: use this
         Standards::cppstd_t cppstd = Standards::CPPLatest;
     };
@@ -816,19 +836,6 @@ namespace {
 
         bool useOfMfc = false;
         bool useUnicode = false;
-    };
-
-    struct ForcedIncludeFiles {
-        ForcedIncludeFiles(std::string condition, const std::string &commaSeparatedFiles) : condition(std::move(condition)) {
-            std::vector<std::string> splitFiles = splitString(commaSeparatedFiles, ';');
-            std::copy(splitFiles.begin(), splitFiles.end(), std::back_inserter(files));
-        }
-        explicit ForcedIncludeFiles(const std::string &commaSeparatedFiles) {
-            std::vector<std::string> splitFiles = splitString(commaSeparatedFiles, ';');
-            std::copy(splitFiles.begin(), splitFiles.end(), std::back_inserter(files));
-        }
-        std::string condition;
-        std::list<std::string> files;
     };
 
     struct ItemGroupClCompile {
@@ -979,6 +986,7 @@ bool ImportProject::importVcxproj(const std::string &filename, const tinyxml2::X
     std::vector<ConfigurationPropertyGroup> configurationPropertyGroups;
     std::string includePath;
     std::vector<SharedItemsProject> sharedItemsProjects;
+    std::list<ForcedIncludeFiles> globalForcedIncludeFiles;
 
     const tinyxml2::XMLElement * const rootnode = doc.FirstChildElement();
     if (rootnode == nullptr) {
@@ -1124,6 +1132,8 @@ bool ImportProject::importVcxproj(const std::string &filename, const tinyxml2::X
                 else if (i.enhancedInstructionSet == "AdvancedVectorExtensions512")
                     fs.defines += ";__AVX512__";
                 additionalIncludePaths += ';' + i.additionalIncludePaths;
+                if (!i.forcedIncludeFiles.empty())
+                    globalForcedIncludeFiles.insert(globalForcedIncludeFiles.end(), i.forcedIncludeFiles.begin(), i.forcedIncludeFiles.end());
             }
             bool useUnicode = false;
             for (const ConfigurationPropertyGroup &c : configurationPropertyGroups) {
@@ -1150,13 +1160,37 @@ bool ImportProject::importVcxproj(const std::string &filename, const tinyxml2::X
                             continue;
                     }
                     for (const std::string &file : forcedInclude.files) {
-                        if (file == "%(ForcedIncludeFiles)")
-                            ; // TODO: needs global ForcedIncludeFiles implemented
-                        else {
+                        if (file == "%(ForcedIncludeFiles)") {
+                            for (const ForcedIncludeFiles &globalForcedInclude : globalForcedIncludeFiles) {
+                                if (!globalForcedInclude.condition.empty()) {
+                                    Conditional conditional(globalForcedInclude.condition);
+                                    if (!conditional.conditionIsTrue(p, compile.mFilename, errors))
+                                        continue;
+                                }
+                                for (const std::string &globalFile : globalForcedInclude.files) {
+                                    std::string toInclude = Path::simplifyPath(Path::isAbsolute(globalFile) ? globalFile : Path::getPathFromFilename(filename) + globalFile);
+                                    findAndReplace(toInclude, "$(MSBuildThisFileDirectory)", "./");
+                                    fs.forcedIncludes.emplace_back(toInclude);
+                                }
+                            }
+                        } else {
                             std::string toInclude = Path::simplifyPath(Path::isAbsolute(file) ? file : Path::getPathFromFilename(filename) + file);
                             findAndReplace(toInclude, "$(MSBuildThisFileDirectory)", "./");
                             fs.forcedIncludes.emplace_back(toInclude);
                         }
+                    }
+                }
+            } else if (!globalForcedIncludeFiles.empty()) {
+                for (const ForcedIncludeFiles &globalForcedInclude : globalForcedIncludeFiles) {
+                    if (!globalForcedInclude.condition.empty()) {
+                        Conditional conditional(globalForcedInclude.condition);
+                        if (!conditional.conditionIsTrue(p, compile.mFilename, errors))
+                            continue;
+                    }
+                    for (const std::string &globalFile : globalForcedInclude.files) {
+                        std::string toInclude = Path::simplifyPath(Path::isAbsolute(globalFile) ? globalFile : Path::getPathFromFilename(filename) + globalFile);
+                        findAndReplace(toInclude, "$(MSBuildThisFileDirectory)", "./");
+                        fs.forcedIncludes.emplace_back(toInclude);
                     }
                 }
             }

@@ -21,10 +21,12 @@ def test_forced1():
     filename1 = os.path.join('forced1', 'DebugX64.cpp')
     filename2 = os.path.join('forced1', 'DebugX64.h')
     filename3 = os.path.join('forced1', 'AllX64.h')
+    filename4 = os.path.join('forced1', 'GlobalDebugX64.h')
     assert ret == 0, stdout
     expected = (
         '[%s:6]: (error) Division by zero.\n'
         '[%s:4]: (error) Division by zero.\n'
-        '[%s:4]: (error) Division by zero.\n' % (filename1, filename2, filename3)
+        '[%s:4]: (error) Division by zero.\n'
+        '[%s:4]: (error) Division by zero.\n' % (filename1, filename2, filename3, filename4)
     )
     assert get_lines(stderr) == get_lines(expected)
