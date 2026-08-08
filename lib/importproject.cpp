@@ -769,11 +769,9 @@ namespace {
     }
 
     struct ForcedIncludeFiles {
-        ForcedIncludeFiles(std::string condition, const std::string &commaSeparatedFiles) : condition(std::move(condition)) {
-            files = toStringList(commaSeparatedFiles);
+        ForcedIncludeFiles(std::string condition, const std::string &commaSeparatedFiles) : condition(std::move(condition)), files(toStringList(commaSeparatedFiles)) {
         }
-        explicit ForcedIncludeFiles(const std::string &commaSeparatedFiles) {
-            files = toStringList(commaSeparatedFiles);
+        explicit ForcedIncludeFiles(const std::string &commaSeparatedFiles) : files(toStringList(commaSeparatedFiles)) {
         }
         std::string condition;
         std::list<std::string> files;
@@ -1185,7 +1183,6 @@ bool ImportProject::importVcxproj(const std::string &filename, const tinyxml2::X
                 fs.includePaths.emplace_back(path);
             }
 
-            std::list<std::string> perFileForcedIncludes;
             if (!compile.forcedIncludeFiles.empty()) {
                 std::list<std::string> temp;
                 for (const ForcedIncludeFiles &forcedInclude : compile.forcedIncludeFiles) {
