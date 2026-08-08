@@ -752,14 +752,28 @@ namespace {
         std::string mCondition;
     };
 
+    static std::list<std::string> toStringList(const std::string &s)
+    {
+        std::list<std::string> ret;
+        std::string::size_type pos1 = 0;
+        std::string::size_type pos2;
+        while ((pos2 = s.find(';', pos1)) != std::string::npos) {
+            ret.push_back(s.substr(pos1, pos2 - pos1));
+            pos1 = pos2 + 1;
+            if (pos1 >= s.size())
+                break;
+        }
+        if (pos1 < s.size())
+            ret.push_back(s.substr(pos1));
+        return ret;
+    }
+
     struct ForcedIncludeFiles {
         ForcedIncludeFiles(std::string condition, const std::string &commaSeparatedFiles) : condition(std::move(condition)) {
-            std::vector<std::string> splitFiles = splitString(commaSeparatedFiles, ';');
-            std::copy(splitFiles.begin(), splitFiles.end(), std::back_inserter(files));
+            files = toStringList(commaSeparatedFiles);
         }
         explicit ForcedIncludeFiles(const std::string &commaSeparatedFiles) {
-            std::vector<std::string> splitFiles = splitString(commaSeparatedFiles, ';');
-            std::copy(splitFiles.begin(), splitFiles.end(), std::back_inserter(files));
+            files = toStringList(commaSeparatedFiles);
         }
         std::string condition;
         std::list<std::string> files;
@@ -783,12 +797,16 @@ namespace {
                                 additionalIncludePaths += ';';
                             additionalIncludePaths += text;
                         } else if (std::strcmp(ename, "LanguageStandard") == 0) {
-                            if (std::strcmp(text, "stdcpp14") == 0)
+                            if (std::strcmp(text, "stdcpp11") == 0)
+                                cppstd = Standards::CPP11;
+                            else if (std::strcmp(text, "stdcpp14") == 0)
                                 cppstd = Standards::CPP14;
                             else if (std::strcmp(text, "stdcpp17") == 0)
                                 cppstd = Standards::CPP17;
                             else if (std::strcmp(text, "stdcpp20") == 0)
                                 cppstd = Standards::CPP20;
+                            else if (std::strcmp(text, "stdcpp23") == 0)
+                                cppstd = Standards::CPP23;
                             else if (std::strcmp(text, "stdcpplatest") == 0)
                                 cppstd = Standards::CPPLatest;
                         } else if (std::strcmp(ename, "EnableEnhancedInstructionSet") == 0) {
@@ -876,22 +894,6 @@ namespace {
         std::list<std::string> mConditions;
         std::list<ForcedIncludeFiles> forcedIncludeFiles;
     };
-}
-
-static std::list<std::string> toStringList(const std::string &s)
-{
-    std::list<std::string> ret;
-    std::string::size_type pos1 = 0;
-    std::string::size_type pos2;
-    while ((pos2 = s.find(';',pos1)) != std::string::npos) {
-        ret.push_back(s.substr(pos1, pos2-pos1));
-        pos1 = pos2 + 1;
-        if (pos1 >= s.size())
-            break;
-    }
-    if (pos1 < s.size())
-        ret.push_back(s.substr(pos1));
-    return ret;
 }
 
 static void importPropertyGroup(const tinyxml2::XMLElement *node, std::map<std::string, std::string, cppcheck::stricmp> &variables, std::string &includePath)
@@ -1052,7 +1054,8 @@ bool ImportProject::importVcxproj(const std::string &filename, const tinyxml2::X
                                 pathToSharedItemsFile = projectAttribute;
                             } else {
                                 pathToSharedItemsFile = variables["ProjectDir"] + projectAttribute;
-                            } if (!simplifyPathWithVariables(pathToSharedItemsFile, variables)) {
+                            }
+                            if (!simplifyPathWithVariables(pathToSharedItemsFile, variables)) {
                                 errors.emplace_back("Could not simplify path to referenced shared items project");
                                 return false;
                             }
