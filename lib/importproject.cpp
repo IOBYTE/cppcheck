@@ -752,7 +752,7 @@ namespace {
         std::string mCondition;
     };
 
-    static std::list<std::string> toStringList(const std::string &s)
+    std::list<std::string> toStringList(const std::string &s)
     {
         std::list<std::string> ret;
         std::string::size_type pos1 = 0;
