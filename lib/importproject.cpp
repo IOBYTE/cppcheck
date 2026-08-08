@@ -769,10 +769,8 @@ namespace {
     }
 
     struct ForcedIncludeFiles {
-        ForcedIncludeFiles(std::string condition, const std::string &commaSeparatedFiles) : condition(std::move(condition)), files(toStringList(commaSeparatedFiles)) {
-        }
-        explicit ForcedIncludeFiles(const std::string &commaSeparatedFiles) : files(toStringList(commaSeparatedFiles)) {
-        }
+        ForcedIncludeFiles(std::string condition, const std::string &commaSeparatedFiles) : condition(std::move(condition)), files(toStringList(commaSeparatedFiles)) {}
+        explicit ForcedIncludeFiles(const std::string &commaSeparatedFiles) : files(toStringList(commaSeparatedFiles)) {}
         std::string condition;
         std::list<std::string> files;
     };
