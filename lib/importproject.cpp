@@ -892,7 +892,11 @@ namespace {
     };
 }
 
-static void importPropertyGroup(const tinyxml2::XMLElement *node, std::map<std::string, std::string, cppcheck::stricmp> &variables, std::string &includePath)
+static void importPropertyGroup(const tinyxml2::XMLElement *node,
+                                std::map<std::string, std::string,
+                                cppcheck::stricmp> &variables,
+                                std::string &includePath,
+                                std::list<ForcedIncludeFiles> &forcedIncludeFiles)
 {
     const char* labelAttribute = node->Attribute("Label");
     if (labelAttribute && std::strcmp(labelAttribute, "UserMacros") == 0) {
@@ -904,21 +908,35 @@ static void importPropertyGroup(const tinyxml2::XMLElement *node, std::map<std::
 
     } else if (!labelAttribute) {
         for (const tinyxml2::XMLElement *propertyGroup = node->FirstChildElement(); propertyGroup; propertyGroup = propertyGroup->NextSiblingElement()) {
-            if (std::strcmp(propertyGroup->Name(), "IncludePath") != 0)
-                continue;
-            const char *text = propertyGroup->GetText();
-            if (!text)
-                continue;
-            std::string path(text);
-            const std::string::size_type pos = path.find("$(IncludePath)");
-            if (pos != std::string::npos)
-                path.replace(pos, 14U, includePath);
-            includePath = std::move(path);
+            if (std::strcmp(propertyGroup->Name(), "IncludePath") == 0) {
+                const char *text = propertyGroup->GetText();
+                if (!text)
+                    continue;
+                std::string path(text);
+                const std::string::size_type pos = path.find("$(IncludePath)");
+                if (pos != std::string::npos)
+                    path.replace(pos, 14U, includePath);
+                includePath = std::move(path);
+            } else if (std::strcmp(propertyGroup->Name(), "ForcedIncludeFiles") == 0) {
+                const char *text = propertyGroup->GetText();
+                if (text) {
+                    const char *condition = propertyGroup->Attribute("Condition");
+                    if (condition)
+                        forcedIncludeFiles.emplace_back(condition, text);
+                    else
+                        forcedIncludeFiles.emplace_back(text);
+                }
+            }
         }
     }
 }
 
-static void loadVisualStudioProperties(const std::string &props, std::map<std::string,std::string,cppcheck::stricmp> &variables, std::string &includePath, const std::string &additionalIncludeDirectories, std::list<ItemDefinitionGroup> &itemDefinitionGroupList)
+static void loadVisualStudioProperties(const std::string &props,
+                                       std::map<std::string,std::string,cppcheck::stricmp> &variables,
+                                       std::string &includePath,
+                                       const std::string &additionalIncludeDirectories,
+                                       std::list<ItemDefinitionGroup> &itemDefinitionGroupList,
+                                       std::list<ForcedIncludeFiles> &forcedIncludeFiles)
 {
     std::string filename(props);
     // variables can't be resolved
@@ -950,11 +968,11 @@ static void loadVisualStudioProperties(const std::string &props, std::map<std::s
                     if (loadprj.find('$') == std::string::npos) {
                         loadprj = Path::getPathFromFilename(filename) + loadprj;
                     }
-                    loadVisualStudioProperties(loadprj, variables, includePath, additionalIncludeDirectories, itemDefinitionGroupList);
+                    loadVisualStudioProperties(loadprj, variables, includePath, additionalIncludeDirectories, itemDefinitionGroupList, forcedIncludeFiles);
                 }
             }
         } else if (std::strcmp(name,"PropertyGroup")==0) {
-            importPropertyGroup(node, variables, includePath);
+            importPropertyGroup(node, variables, includePath, forcedIncludeFiles);
         } else if (std::strcmp(name,"ItemDefinitionGroup")==0) {
             itemDefinitionGroupList.emplace_back(node, additionalIncludeDirectories);
         }
@@ -976,7 +994,11 @@ bool ImportProject::importVcxproj(const std::string &filename,
     return importVcxproj(filename, doc, variables, additionalIncludeDirectories, fileFilters, cache);
 }
 
-bool ImportProject::importVcxproj(const std::string &filename, const tinyxml2::XMLDocument &doc, std::map<std::string, std::string, cppcheck::stricmp> &variables, const std::string &additionalIncludeDirectories, const std::vector<std::string> &fileFilters, std::vector<SharedItemsProject> &cache)
+bool ImportProject::importVcxproj(const std::string &filename,
+                                  const tinyxml2::XMLDocument &doc,
+                                  std::map<std::string, std::string, cppcheck::stricmp> &variables,
+                                  const std::string &additionalIncludeDirectories,
+                                  const std::vector<std::string> &fileFilters, std::vector<SharedItemsProject> &cache)
 {
     variables["ProjectDir"] = Path::simplifyPath(Path::getPathFromFilename(filename));
 
@@ -986,6 +1008,7 @@ bool ImportProject::importVcxproj(const std::string &filename, const tinyxml2::X
     std::vector<ConfigurationPropertyGroup> configurationPropertyGroups;
     std::string includePath;
     std::vector<SharedItemsProject> sharedItemsProjects;
+    std::list<ForcedIncludeFiles> propertyGroupForcedIncludes;
 
     const tinyxml2::XMLElement * const rootnode = doc.FirstChildElement();
     if (rootnode == nullptr) {
@@ -1013,7 +1036,11 @@ bool ImportProject::importVcxproj(const std::string &filename, const tinyxml2::X
                         if (include && Path::acceptFile(include)) {
                             std::string toInclude = include;
                             findAndReplace(toInclude, "$(MSBuildThisFileDirectory)", "./");
+                            findAndReplace(toInclude, "$(ProjectDir)", variables["ProjectDir"]);
+                            findAndReplace(toInclude, "$(SolutionDir)", variables["SolutionDir"]);
                             toInclude = Path::simplifyPath(Path::isAbsolute(toInclude) ? toInclude : Path::getPathFromFilename(filename) + toInclude);
+                            if (toInclude.find("$(") != std::string::npos)
+                                errors.emplace_back(filename + ": Can't evaluate forced include file: " + toInclude);
                             compileList.emplace_back(e, toInclude);
                         }
                     }
@@ -1026,7 +1053,7 @@ bool ImportProject::importVcxproj(const std::string &filename, const tinyxml2::X
             if (labelAttribute && std::strcmp(labelAttribute, "Configuration") == 0) {
                 configurationPropertyGroups.emplace_back(node);
             } else {
-                importPropertyGroup(node, variables, includePath);
+                importPropertyGroup(node, variables, includePath, propertyGroupForcedIncludes);
             }
         } else if (std::strcmp(name, "ImportGroup") == 0) {
             const char *labelAttribute = node->Attribute("Label");
@@ -1035,7 +1062,7 @@ bool ImportProject::importVcxproj(const std::string &filename, const tinyxml2::X
                     if (std::strcmp(e->Name(), "Import") == 0) {
                         const char *projectAttribute = e->Attribute("Project");
                         if (projectAttribute)
-                            loadVisualStudioProperties(projectAttribute, variables, includePath, additionalIncludeDirectories, itemDefinitionGroupList);
+                            loadVisualStudioProperties(projectAttribute, variables, includePath, additionalIncludeDirectories, itemDefinitionGroupList, propertyGroupForcedIncludes);
                     }
                 }
             } else if (labelAttribute && std::strcmp(labelAttribute, "Shared") == 0) {
@@ -1117,6 +1144,25 @@ bool ImportProject::importVcxproj(const std::string &filename, const tinyxml2::X
             }
             std::string additionalIncludePaths;
             std::list<std::string> globalForcedIncludeFiles;
+            for (const ForcedIncludeFiles &propForced : propertyGroupForcedIncludes) {
+                if (!propForced.condition.empty()) {
+                    Conditional conditional(propForced.condition);
+                    if (!conditional.conditionIsTrue(p, compile.mFilename, errors))
+                        continue;
+                }
+                for (const std::string &f : propForced.files) {
+                    if (f.empty() || startsWith(f, "%("))
+                        continue;
+                    std::string toInclude = f;
+                    findAndReplace(toInclude, "$(MSBuildThisFileDirectory)", "./");
+                    findAndReplace(toInclude, "$(ProjectDir)", variables["ProjectDir"]);
+                    findAndReplace(toInclude, "$(SolutionDir)", variables["SolutionDir"]);
+                    toInclude = Path::simplifyPath(Path::isAbsolute(toInclude) ? toInclude: Path::getPathFromFilename(filename) + toInclude);
+                    if (toInclude.find("$(") != std::string::npos)
+                        errors.emplace_back(filename + ": Can't evaluate forced include file: " + toInclude);
+                    globalForcedIncludeFiles.push_back(toInclude);
+                }
+            }
             for (const ItemDefinitionGroup &i : itemDefinitionGroupList) {
                 if (!i.conditionIsTrue(p, compile.mFilename, errors))
                     continue;
@@ -1133,9 +1179,8 @@ bool ImportProject::importVcxproj(const std::string &filename, const tinyxml2::X
                 else if (i.enhancedInstructionSet == "AdvancedVectorExtensions512")
                     fs.defines += ";__AVX512__";
                 additionalIncludePaths += ';' + i.additionalIncludePaths;
-
+                std::list<std::string> tempFiles;
                 if (!i.forcedIncludeFiles.empty()) {
-                    std::list<std::string> tempFiles;
                     for (const ForcedIncludeFiles &forcedInclude : i.forcedIncludeFiles) {
                         if (!forcedInclude.condition.empty()) {
                             Conditional conditional(forcedInclude.condition);
@@ -1144,9 +1189,9 @@ bool ImportProject::importVcxproj(const std::string &filename, const tinyxml2::X
                         }
                         for (const std::string &forcedFile : forcedInclude.files) {
                             if (forcedFile == "%(ForcedIncludeFiles)") {
-                                // ignore for now until property sheets are handled
-                                continue;
-                            } if (forcedFile == "%(ClCompile.ForcedIncludeFiles)") {
+                                if (!globalForcedIncludeFiles.empty())
+                                    tempFiles.insert(tempFiles.end(), globalForcedIncludeFiles.begin(), globalForcedIncludeFiles.end());
+                            } else if (forcedFile == "%(ClCompile.ForcedIncludeFiles)") {
                                 tempFiles.insert(tempFiles.end(), globalForcedIncludeFiles.begin(), globalForcedIncludeFiles.end());
                             } else if (forcedFile.find("%(") != std::string::npos) {
                                 errors.emplace_back(compile.mFilename + ": Can't evaluate forced include file: " + forcedFile);
@@ -1154,14 +1199,16 @@ bool ImportProject::importVcxproj(const std::string &filename, const tinyxml2::X
                             } else {
                                 std::string toInclude = forcedFile;
                                 findAndReplace(toInclude, "$(MSBuildThisFileDirectory)", "./");
+                                findAndReplace(toInclude, "$(ProjectDir)", variables["ProjectDir"]);
+                                findAndReplace(toInclude, "$(SolutionDir)", variables["SolutionDir"]);
                                 toInclude = Path::simplifyPath(Path::isAbsolute(toInclude) ? toInclude : Path::getPathFromFilename(filename) + toInclude);
                                 if (toInclude.find("$(") != std::string::npos)
-                                    errors.emplace_back(compile.mFilename + ": Can't evaluate forced include file: " + forcedFile);
+                                    errors.emplace_back(filename + ": Can't evaluate forced include file: " + toInclude);
                                 tempFiles.push_back(toInclude);
                             }
                         }
-                        globalForcedIncludeFiles = tempFiles;
                     }
+                    globalForcedIncludeFiles = tempFiles;
                 }
             }
             bool useUnicode = false;
@@ -1198,26 +1245,29 @@ bool ImportProject::importVcxproj(const std::string &filename, const tinyxml2::X
                         } else {
                             std::string toInclude = perFile;
                             findAndReplace(toInclude, "$(MSBuildThisFileDirectory)", "./");
+                            findAndReplace(toInclude, "$(ProjectDir)", variables["ProjectDir"]);
+                            findAndReplace(toInclude, "$(SolutionDir)", variables["SolutionDir"]);
                             toInclude = Path::simplifyPath(Path::isAbsolute(toInclude) ? toInclude : Path::getPathFromFilename(filename) + toInclude);
                             if (toInclude.find("$(") != std::string::npos)
-                                errors.emplace_back(compile.mFilename + ": Can't evaluate forced include file: " + perFile);
+                                errors.emplace_back(filename + ": Can't evaluate forced include file: " + toInclude);
                             temp.emplace_back(toInclude);
                         }
                     }
                 }
                 fs.forcedIncludes = temp;
             } else if (!globalForcedIncludeFiles.empty()) {
-                for (std::string &globalFile : globalForcedIncludeFiles) {
+                std::list<std::string> resolved;
+                for (const std::string &globalFile : globalForcedIncludeFiles) {
                     std::string toInclude = globalFile;
                     findAndReplace(toInclude, "$(MSBuildThisFileDirectory)", "./");
+                    findAndReplace(toInclude, "$(ProjectDir)", variables["ProjectDir"]);
+                    findAndReplace(toInclude, "$(SolutionDir)", variables["SolutionDir"]);
                     toInclude = Path::simplifyPath(Path::isAbsolute(toInclude) ? toInclude : Path::getPathFromFilename(filename) + toInclude);
-                    if (toInclude.find("$(") != std::string::npos) {
-                        errors.emplace_back(compile.mFilename + ": Can't evaluate forced include file: " + toInclude);
-                        continue;
-                    }
-                    globalFile = toInclude;
+                    if (toInclude.find("$(") != std::string::npos)
+                        errors.emplace_back(filename + ": Can't evaluate forced include file: " + toInclude);
+                    resolved.push_back(toInclude);
                 }
-                fs.forcedIncludes = globalForcedIncludeFiles;
+                fs.forcedIncludes = resolved;
             }
 
             fileSettings.push_back(std::move(fs));
