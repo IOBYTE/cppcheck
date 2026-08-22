@@ -278,6 +278,13 @@ static bool simplifyPathWithVariables(std::string &s, VariablesMap &variables)
     return true;
 }
 
+static std::string toAbsolute(const std::string &path)
+{
+    if (Path::isAbsolute(path))
+        return Path::simplifyPath(path);
+    return Path::simplifyPath(Path::getCurrentPath() + "/" + path);
+}
+
 static std::string toAbsolute(const std::string &filename, const std::string &baseDir, VariablesMap &variables)
 {
     std::string resolved(filename);
@@ -353,7 +360,7 @@ ImportProject::Type ImportProject::import(const std::string &filename, Settings 
             return ImportProject::Type::VS_SLNX;
         }
     } else if (endsWith(filename, ".vcxproj")) {
-        if (importVcxproj(Path::getAbsoluteFilePath(filename), mVariables, fileFilters)) {
+        if (importVcxproj(toAbsolute(filename), mVariables, fileFilters)) {
             setRelativePaths(filename);
             return ImportProject::Type::VS_VCXPROJ;
         }
@@ -489,7 +496,7 @@ bool ImportProject::importSln(std::istream &istr, const std::string &path, const
         }
     }
 
-    const std::string solutionDir = Path::getAbsoluteFilePath(path);
+    const std::string solutionDir = toAbsolute(path);
     mVariables["SolutionDir"] = solutionDir;
 
     bool found = false;
@@ -541,7 +548,7 @@ bool ImportProject::importSlnx(const std::string& filename, const std::vector<st
         return false;
     }
 
-    mVariables["SolutionDir"] = Path::getAbsoluteFilePath(Path::getPathFromFilename(filename));
+    mVariables["SolutionDir"] = toAbsolute(Path::getPathFromFilename(filename));
 
     bool found = false;
 
