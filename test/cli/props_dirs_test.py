@@ -18,10 +18,10 @@ from testutils import cppcheck
 
 __script_dir = os.path.dirname(os.path.abspath(__file__))
 
-__ERR_A = ('%s:10:14: error: Division by zero. [zerodiv]\n'
+__ERR_A = ('%s:14:14: error: Division by zero. [zerodiv]\n'
            '    return x / 0;\n'
            '             ^\n') % os.path.join('props-dirs', 'ProjA', 'a.cpp')
-__ERR_B = ('%s:10:14: error: Division by zero. [zerodiv]\n'
+__ERR_B = ('%s:14:14: error: Division by zero. [zerodiv]\n'
            '    return y / 0;\n'
            '             ^\n') % os.path.join('props-dirs', 'ProjB', 'b.cpp')
 
@@ -65,14 +65,29 @@ def test_props_dirs_defines_and_standard():
     with open(dump_b, 'rt') as f:
         dump_b_content = f.read()
 
-    # ProjA imports shared/shared.props (which itself imports common/common.props), and
-    # also sets its own PROJA_DEFINE - all three must be present, most specific first
-    assert 'cfg="_WIN32=1;_WIN64=1;PROJA_DEFINE=1;SHARED_DEFINE=1;COMMON_DEFINE=1;_MSC_VER=1900"' in dump_a_content
+    # ProjA imports shared/shared.props (-> common/common.props) and shared/shared2.props
+    # (-> common/common2.props), and sets its own PROJA_DEFINE.
+    # v143 toolset -> _MSC_VER=1930/_MSC_FULL_VER=193000000; common.props sets stdcpp17
+    # -> _MSVC_LANG=201703L.
+    assert '_WIN32=1' in dump_a_content
+    assert '_WIN64=1' in dump_a_content
+    assert '_M_X64=100' in dump_a_content
+    assert '_MSC_VER=1930' in dump_a_content
+    assert '_MSC_FULL_VER=193000000' in dump_a_content
+    assert '_MSVC_LANG=201703L' in dump_a_content
+    assert 'PROJA_DEFINE=1' in dump_a_content
+    assert 'SHARED_DEFINE=1' in dump_a_content
+    assert 'COMMON_DEFINE=1' in dump_a_content
     assert '<cpp version="c++17"/>' in dump_a_content
 
-    # ProjB imports common/common.props directly - it must see COMMON_DEFINE, but neither
-    # PROJA_DEFINE nor SHARED_DEFINE, which only ever applied to ProjA
-    assert 'cfg="_WIN32=1;_WIN64=1;COMMON_DEFINE=1;_MSC_VER=1900"' in dump_b_content
+    # ProjB imports common/common.props and common/common2.props directly - it must see
+    # COMMON2_DEFINE and COMMON_DEFINE, but none of ProjA's or shared's defines.
+    assert '_MSC_VER=1930' in dump_b_content
+    assert '_MSC_FULL_VER=193000000' in dump_b_content
+    assert '_MSVC_LANG=201703L' in dump_b_content
+    assert 'COMMON2_DEFINE=1' in dump_b_content
+    assert 'COMMON_DEFINE=1' in dump_b_content
     assert '<cpp version="c++17"/>' in dump_b_content
     assert 'PROJA_DEFINE' not in dump_b_content
     assert 'SHARED_DEFINE' not in dump_b_content
+    assert 'SHARED2_DEFINE' not in dump_b_content
