@@ -268,14 +268,7 @@ static std::string msbuildUnescape(const std::string &s)
         if (s[i] == '%' && i + 2 < s.size() &&
             std::isxdigit(static_cast<unsigned char>(s[i + 1])) &&
             std::isxdigit(static_cast<unsigned char>(s[i + 2]))) {
-            const auto hexVal = [](char c) -> unsigned char {
-                if (c >= '0' && c <= '9')
-                    return static_cast<unsigned char>(c - '0');
-                if (c >= 'a' && c <= 'f')
-                    return static_cast<unsigned char>(c - 'a' + 10);
-                return static_cast<unsigned char>(c - 'A' + 10);
-            };
-            result += static_cast<char>((hexVal(s[i + 1]) << 4) | hexVal(s[i + 2]));
+            result += static_cast<char>(std::stoi(s.substr(i + 1, 2), nullptr, 16));
             i += 2;
         } else {
             result += s[i];
@@ -865,9 +858,14 @@ std::string ImportProject::applyMSBuildStaticFunction(const std::string &classNa
     const auto toInt = [](const std::string &s, long long &out) -> bool {
         if (s.empty())
             return false;
-        char *end = nullptr;
-        out = std::strtoll(s.c_str(), &end, 10);
-        return end != s.c_str() && *end == '\0';
+        try {
+            size_t idx = 0;
+            out = std::stoll(s, &idx);
+            return idx == s.length();
+        }
+        catch (...) {
+            return false;
+        }
     };
 
     if (caseInsensitiveStringCompare(className, "MSBuild") == 0) {
